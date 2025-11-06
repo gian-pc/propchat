@@ -24,7 +24,6 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
   const handlePropertyClick = (property: Property) => {
-    // Por ahora solo log, después abriremos modal
     console.log('Clicked property:', property)
   }
 
