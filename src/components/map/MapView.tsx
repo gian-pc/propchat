@@ -19,7 +19,9 @@ export default function MapView({ hoveredPropertyId, onMarkerClick }: MapViewPro
   const [viewState, setViewState] = useState({
     longitude: -77.0428,
     latitude: -12.0464,
-    zoom: 11
+    zoom: 15,
+    pitch: 60,
+    bearing: 0
   })
   
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
@@ -53,13 +55,58 @@ export default function MapView({ hoveredPropertyId, onMarkerClick }: MapViewPro
   }
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full relative">
       <Map
         {...viewState}
         onMove={(evt: ViewStateChangeEvent) => setViewState(evt.viewState)}
         style={{ width: '100%', height: '100%' }}
-        mapStyle={`https://api.mapbox.com/styles/v1/mapbox/streets-v12?access_token=${MAPBOX_TOKEN}`}
+        mapStyle="mapbox://styles/mapbox/streets-v12"
         mapboxAccessToken={MAPBOX_TOKEN}
+        onLoad={(evt) => {
+          const map = evt.target
+          
+          // Agregar capa de edificios 3D
+          if (!map.getLayer('3d-buildings')) {
+            const layers = map.getStyle().layers
+            const labelLayerId = layers?.find(
+              (layer: any) => layer.type === 'symbol' && layer.layout?.['text-field']
+            )?.id
+
+            map.addLayer(
+              {
+                id: '3d-buildings',
+                source: 'composite',
+                'source-layer': 'building',
+                filter: ['==', 'extrude', 'true'],
+                type: 'fill-extrusion',
+                minzoom: 15,
+                paint: {
+                  'fill-extrusion-color': '#aaa',
+                  'fill-extrusion-height': [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    15,
+                    0,
+                    15.05,
+                    ['get', 'height']
+                  ],
+                  'fill-extrusion-base': [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    15,
+                    0,
+                    15.05,
+                    ['get', 'min_height']
+                  ],
+                  'fill-extrusion-opacity': 0.6
+                }
+              },
+              labelLayerId
+            )
+          }
+        }}
       >
         {/* Property Markers */}
         {mockProperties.map((property) => {
@@ -86,7 +133,7 @@ export default function MapView({ hoveredPropertyId, onMarkerClick }: MapViewPro
           )
         })}
 
-        {/* Popup when property is selected */}
+        {/* Popup */}
         {selectedProperty && (
           <Popup
             longitude={selectedProperty.longitude}
