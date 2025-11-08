@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import ChatWidget from '@/components/chat/ChatWidget'
+import PropertyDetailsModal from '@/components/property/PropertyDetailsModal'
 import { mockProperties } from '@/lib/mockData'
 import type { Property } from '@/types/property'
 
@@ -20,21 +21,36 @@ const MapView = dynamic(
 
 export default function Home() {
   const [hoveredProperty, setHoveredProperty] = useState<Property | null>(null)
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const handlePropertyClick = (property: Property) => {
-    console.log('Clicked property:', property)
+    setSelectedProperty(property)
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setTimeout(() => setSelectedProperty(null), 300)
   }
 
   return (
     <div className="h-screen w-full relative">
-      {/* Solo el Mapa */}
+      {/* Mapa */}
       <MapView 
         hoveredPropertyId={hoveredProperty?.id}
         onMarkerClick={handlePropertyClick}
       />
 
-      {/* Solo el Chat */}
+      {/* Chat */}
       <ChatWidget />
+
+      {/* Modal de Detalles */}
+      <PropertyDetailsModal
+        property={selectedProperty}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+      />
     </div>
   )
 }
