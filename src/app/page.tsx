@@ -7,6 +7,7 @@ import ChatWidget from '@/components/chat/ChatWidget'
 import PropertyDetailsModal from '@/components/property/PropertyDetailsModal'
 import PropertyList from '@/components/property/PropertyList'
 import { api, Property, PropertyFilters } from '@/services/api' 
+import { toast } from 'sonner' // Para mostrar notificaciones
 
 const MapView = dynamic(
   () => import('@/components/map/MapView'),
@@ -20,6 +21,9 @@ const MapView = dynamic(
   }
 )
 
+// Define el tipo para el Bbox
+type BBox = [number, number, number, number];
+
 export default function Home() {
   const [filters, setFilters] = useState<PropertyFilters>({});
   const [allProperties, setAllProperties] = useState<Property[]>([]) 
@@ -31,75 +35,136 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [panToProperty, setPanToProperty] = useState<Property | null>(null)
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
-  const [departmentBbox, setDepartmentBbox] = useState<[number, number, number, number] | null>(null);
+  const [departmentBbox, setDepartmentBbox] = useState<BBox | null>(null); 
 
-  // useEffect de Carga
+  // Bandera para saber si el cambio de filtro vino del chat
+  const [isChatFiltering, setIsChatFiltering] = useState(false);
+
+  // --- useEffect de Carga (MODIFICADO) ---
   useEffect(() => {
     const fetchProperties = async () => {
       try {
         setLoading(true);
         const responseData = await api.getProperties(filters);
-        setAllProperties(responseData.properties); // <-- Carga TODAS las propiedades
-        handleClearSelection(); 
+        setAllProperties(responseData.properties);
+        
+        // Si no estamos filtrando por chat, ocultamos la lista. 
+        if (!isChatFiltering) {
+          handleClearSelection(); 
+        }
+
+        if (Object.keys(filters).length > 0) {
+             toast.success(`${responseData.properties.length} propiedades encontradas con los filtros aplicados.`);
+        }
+
       } catch (error) {
         console.error("Error fetching properties in page:", error)
+        toast.error("Error al cargar propiedades. Revisa tu backend.");
       } finally {
-        setLoading(false)
+        setLoading(false);
+        setIsChatFiltering(false); // Reseteamos la bandera
       }
     };
     fetchProperties()
   }, [filters]);
 
-  
-  // Función del Navbar
-  const handleFilterChange = (newFilters: PropertyFilters) => {
-    setFilters(newFilters);
+
+  // Función para limpiar la selección y OCULTAR LISTA al inicio
+  const handleClearSelection = () => {
+    setDisplayedProperties([]); // OCULTA LA LISTA AL INICIO
+    setHoveredProperty(null);
+    setSelectedProperty(null);
+    setPanToProperty(null);
+    setSelectedDepartment(null);
+    setDepartmentBbox(null);
   };
-
-  // Clic en MARCADOR (Mapa)
-  const handleMarkerClick = (property: Property) => {
-    setDisplayedProperties([property]) 
-    setPanToProperty(property) 
-    setSelectedDepartment(null); 
-    setDepartmentBbox(null); 
-  }
-
-  // Clic en TARJETA (Lista)
-  const handleCardClick = (property: Property) => {
-    setSelectedProperty(property)
-    setIsModalOpen(true)
-  }
-
-  // Clic en MODAL (Cerrar)
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
-    setTimeout(() => setSelectedProperty(null), 300)
-  }
   
-  // Clic en DEPARTAMENTO (Mapa)
-  const handleDepartmentSelect = (departmentName: string, bbox: [number, number, number, number]) => {
+  // Función para manejar el clic en la tarjeta (muestra modal, centra mapa)
+  const handleCardClick = (property: Property) => {
+    setSelectedProperty(property);
+    setIsModalOpen(true);
+    setPanToProperty(property); 
+  };
+  
+  // Función para manejar el clic en el marcador (activa lista, centra mapa)
+  const handleMarkerClick = (property: Property) => {
+    setDisplayedProperties([property]); 
+    setPanToProperty(property); // Centra en la propiedad
+    setSelectedDepartment(property.department.toUpperCase()); // Selecciona visualmente el dpto
+    setDepartmentBbox(null);
+  };
+  
+  // FUNCIÓN MODIFICADA: Llamada desde el mapa (con BBox) O desde la IA (con BBox=null)
+  const handleDepartmentSelect = (departmentName: string, bbox: BBox | null) => {
     const upperDeptName = departmentName.toUpperCase();
     
-    // Filtra desde 'allProperties'
-    const filteredProps = allProperties.filter(
-      p => p.department && p.department.toUpperCase() === upperDeptName
+    // Filtra las propiedades que coinciden con el nombre del departamento
+    const filteredPropsByDept = allProperties.filter(
+        p => p.department && p.department.toUpperCase() === upperDeptName
     );
-    
-    setDisplayedProperties(filteredProps); // <-- Actualiza la LISTA
-    setSelectedDepartment(upperDeptName); 
-    setPanToProperty(null); 
-    setDepartmentBbox(bbox); 
-  }
 
-  // Clic en "Limpiar Selección"
-  const handleClearSelection = () => {
-    setDisplayedProperties([]) 
-    setHoveredProperty(null)
-    setSelectedProperty(null)
-    setPanToProperty(null)
-    setSelectedDepartment(null);
-    setDepartmentBbox(null); 
+    setDisplayedProperties(filteredPropsByDept); // Muestra la lista
+    setSelectedDepartment(upperDeptName); // Resalta el polígono
+    setPanToProperty(null); 
+    setDepartmentBbox(bbox); // Hace zoom inteligente si el BBox no es nulo
   }
+  
+  // --- FUNCIÓN DEL CHAT (CORREGIDA PARA SINCRONIZACIÓN) ---
+  const handleAIChatFilters = (aiFilters: PropertyFilters) => {
+    if (!aiFilters) return;
+
+    const departmentName = aiFilters.department;
+    
+    // Separamos el department del resto de filtros de la API
+    const { department, ...restOfFiltersFromAI } = aiFilters;
+    
+    // 1. Aplicamos los filtros de la API (Esto recarga la data)
+    const newFilters = { ...filters, ...restOfFiltersFromAI };
+    setFilters(newFilters);
+    setIsChatFiltering(true); // Ponemos la bandera de que es un filtro de chat
+
+    // 2. Si hay un departamento, SIMULAMOS LA SELECCIÓN DEL MAPA
+    if (departmentName) {
+      const upperDeptName = departmentName.toUpperCase();
+      
+      // Buscamos la primera propiedad para centrar la vista
+      const firstProp = allProperties.find(
+          p => p.department && p.department.toUpperCase() === upperDeptName
+      );
+
+      if (firstProp) {
+          // Centramos el mapa en la propiedad del departamento (esto activa el pan)
+          setPanToProperty(firstProp); 
+          
+          // Resaltamos el polígono. (Pasamos NULL porque no tenemos el BBox aquí)
+          setSelectedDepartment(upperDeptName);
+          
+          // Filtramos la lista visible para que SOLO muestre las de ese dpto.
+          const filteredPropsByDept = allProperties.filter(p => p.department && p.department.toUpperCase() === upperDeptName);
+          setDisplayedProperties(filteredPropsByDept);
+          
+          toast.info(`Filtros de chat aplicados. Centrando en ${departmentName}.`);
+
+      } else {
+          // Si no encontramos propiedades en el dpto, limpiamos el mapa
+          toast.warning(`La IA sugirió ${departmentName}, pero no se encontraron propiedades.`);
+          handleClearSelection();
+      }
+    }
+  };
+  
+  // --- (El resto de funciones) ---
+  const handleFilterChange = (newFilters: PropertyFilters) => {
+    setFilters(newFilters);
+    handleClearSelection(); // Limpiamos la selección del mapa al usar el Navbar
+  };
+  
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProperty(null);
+  };
+  
+  // ... (otros handlers sin cambios) ...
 
 
   return (
@@ -118,8 +183,8 @@ export default function Home() {
           `}
         >
           <MapView 
-            properties={allProperties} // <-- ¡CLAVE! El mapa SIEMPRE recibe TODAS las props
-            filteredProperties={displayedProperties} // <-- ¡NUEVO! Pasa las props filtradas
+            properties={allProperties}
+            filteredProperties={displayedProperties} // Aquí pasamos las filtradas
             hoveredPropertyId={hoveredProperty?.id}
             onMarkerClick={handleMarkerClick}
             panToProperty={panToProperty}
@@ -127,7 +192,8 @@ export default function Home() {
             selectedDepartment={selectedDepartment}
             departmentBbox={departmentBbox}
           />
-          <ChatWidget />
+          {/* ¡Le pasamos la nueva función al ChatWidget! */}
+          <ChatWidget onFiltersExtracted={handleAIChatFilters} /> 
         </div>
 
         {/* Columna 2: La Lista */}
@@ -141,7 +207,7 @@ export default function Home() {
         >
           <div className="w-full h-full overflow-y-auto">
             <PropertyList
-              properties={displayedProperties} // <-- La lista SÍ recibe las props filtradas
+              properties={displayedProperties} // Muestra la lista de propiedades visibles
               loading={loading}
               onPropertySelect={handleCardClick}
               onPropertyHover={setHoveredProperty}

@@ -45,7 +45,7 @@ export default function Map({
   const activePopup = useRef<mapboxgl.Popup | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
 
-  // --- 1. useEffect de Inicialización (MODIFICADO) ---
+  // --- 1. useEffect de Inicialización (COMPLETO) ---
   useEffect(() => {
     if (!mapContainer.current || map.current) return; 
 
@@ -71,13 +71,13 @@ export default function Map({
         generateId: true 
       });
 
-      // 2. Añadir Layer Fill (Departamentos) - (Relleno verde en hover)
+      // 2. Añadir Layer Fill (Departamentos)
       currentMap.addLayer({
         id: 'departamentos-fill',
         type: 'fill',
         source: 'departamentos-source',
         paint: {
-          'fill-color': '#10b981', // Verde
+          'fill-color': '#10b981', 
           'fill-opacity': [ 
             'case',
             ['all', ['boolean', ['feature-state', 'hover'], false], ['!', ['boolean', ['feature-state', 'selected'], false]]], 0.3,
@@ -86,40 +86,32 @@ export default function Map({
         }
       });
 
-      
-      // 3. Añadir Layer Borders (UNA SOLA CAPA)
+      // 3. Añadir Layer Borders (Departamentos)
       currentMap.addLayer({
         id: 'departamentos-borders', 
         type: 'line',
         source: 'departamentos-source',
         paint: {
-          // Color dinámico
           'line-color': [ 
             'case',
             ['boolean', ['feature-state', 'selected'], false], '#3b82f6', // AZUL si 'selected'
             '#aaaaaa' // Gris por defecto
           ],
-          // Ancho dinámico
           'line-width': [ 
             'case',
             ['boolean', ['feature-state', 'selected'], false], 2.5, // 2.5px si 'selected'
             1 // 1px por defecto
           ],
-          // Opacidad dinámica
           'line-opacity': [ 
             'case',
             ['boolean', ['feature-state', 'selected'], false], 1.0, // Sólido si 'selected'
             0.8 // Semi-transparente por defecto
           ],
-          
-          // --- ¡AQUÍ ESTÁ EL ARREGLO! ---
-          // Quitamos la lógica 'case' y la dejamos sólida siempre
           'line-dasharray': ['literal', []] // SÓLIDO siempre
         }
       });
-      // --- FIN DEL ARREGLO ---
 
-      // 4. Clic en DEPARTAMENTO (sin cambios)
+      // 4. Clic en DEPARTAMENTO
       currentMap.on('click', 'departamentos-fill', (e) => {
         if (activePopup.current) {
           activePopup.current.remove();
@@ -142,7 +134,7 @@ export default function Map({
         }
       });
       
-      // 5. Mousemove (Departamentos) (sin cambios)
+      // 5. Mousemove (Departamentos)
       currentMap.on('mousemove', 'departamentos-fill', (e) => {
         currentMap.getCanvas().style.cursor = 'pointer';
         if (!e.features || e.features.length === 0) return;
@@ -155,7 +147,7 @@ export default function Map({
         }
       });
       
-      // 6. Mouseleave (Departamentos) (sin cambios)
+      // 6. Mouseleave (Departamentos)
       currentMap.on('mouseleave', 'departamentos-fill', () => {
         currentMap.getCanvas().style.cursor = '';
         if (hoveredDeptId.current !== null) {
@@ -164,7 +156,7 @@ export default function Map({
         hoveredDeptId.current = null;
       });
 
-      // --- Capa de Marcadores (Propiedades) (sin cambios) ---
+      // --- Capa de Marcadores (Propiedades) ---
       currentMap.addSource('properties-source', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] }
@@ -193,9 +185,8 @@ export default function Map({
       currentMap.on('mouseleave', 'properties-circles', () => {
         currentMap.getCanvas().style.cursor = '';
       });
-      // --- Fin Capa Marcadores ---
 
-      // Clic en el MAPA BASE (sin cambios)
+      // Clic en el MAPA BASE
       currentMap.on('click', () => {
         if (activePopup.current) {
           activePopup.current.remove();
@@ -213,7 +204,6 @@ export default function Map({
 
   // --- 2. useEffect de Marcadores (COMPLETO) ---
   useEffect(() => {
-    // Espera a que el mapa esté listo
     if (!isMapLoaded || !map.current || !map.current.getSource('properties-source') || !properties) {
       return;
     }
@@ -256,7 +246,7 @@ export default function Map({
   }, [isMapLoaded, properties, filteredProperties, hoveredPropertyId, selectedDepartment]);
 
 
-  // --- 3. useEffect de Panning por MARCADOR (COMPLETO) ---
+  // --- 3. useEffect de Panning por MARCADOR (CORREGIDO) ---
   useEffect(() => {
     if (!map.current) return;
 
@@ -264,13 +254,20 @@ export default function Map({
       activePopup.current.remove();
       activePopup.current = null;
     }
+
     if (panToProperty) { 
       const sidebarWidthInPixels = window.innerWidth * (2 / 5);
+      
+      // Altura del chat: ~200px (alto) + 24px (margen inferior)
+      const chatWidgetHeight = 224; 
+      
       map.current.easeTo({
         center: [panToProperty.longitude, panToProperty.latitude],
-        padding: { top: 0, bottom: 0, left: 0, right: sidebarWidthInPixels },
+        padding: { top: 0, bottom: chatWidgetHeight, left: 0, right: sidebarWidthInPixels }, // <-- ¡ARREGLO CHAT!
         duration: 1000 
       });
+
+      // 3. ...¡Crea y muestra el popup!
       activePopup.current = new mapboxgl.Popup({ 
           offset: 25, 
           closeButton: false,
