@@ -15,6 +15,8 @@ export interface Property {
   imageUrl: string;
   type: 'apartment' | 'house';
   description?: string;
+  department: string;
+  transaction_type: 'rent' | 'sale'; // <-- ¡AÑADIDO!
 }
 
 export interface PropertyFilters {
@@ -23,6 +25,7 @@ export interface PropertyFilters {
   max_price?: number;
   bedrooms?: number;
   property_type?: string;
+  transaction_type?: 'rent' | 'sale'; // <-- ¡AÑADIDO!
 }
 
 export interface PropertiesResponse {
@@ -46,11 +49,16 @@ export const api = {
   async getProperties(filters?: PropertyFilters): Promise<PropertiesResponse> {
     const params = new URLSearchParams();
     
+    // Todos tus filtros existentes
     if (filters?.district) params.append('district', filters.district);
     if (filters?.min_price) params.append('min_price', filters.min_price.toString());
     if (filters?.max_price) params.append('max_price', filters.max_price.toString());
     if (filters?.bedrooms) params.append('bedrooms', filters.bedrooms.toString());
     if (filters?.property_type) params.append('property_type', filters.property_type);
+    
+    // --- ¡AQUÍ ESTÁ EL CAMBIO! ---
+    // Añadimos el nuevo filtro de Venta/Alquiler
+    if (filters?.transaction_type) params.append('transaction_type', filters.transaction_type);
 
     const url = `${API_BASE_URL}/api/properties${params.toString() ? `?${params.toString()}` : ''}`;
     

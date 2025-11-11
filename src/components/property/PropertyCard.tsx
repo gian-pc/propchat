@@ -1,64 +1,74 @@
 // src/components/property/PropertyCard.tsx
 'use client'
 
-import { Property } from '@/types/property'
+import { Property } from '@/services/api'
+import Image from 'next/image'
+import { IoBedOutline } from 'react-icons/io5'
+import { LuBath } from 'react-icons/lu'
+import { TfiRulerAlt } from 'react-icons/tfi'
 
 interface PropertyCardProps {
   property: Property
-  isHovered?: boolean
-  onHover?: () => void
-  onLeave?: () => void
-  onClick?: () => void
+  onClick: () => void
+  onMouseEnter: () => void
+  onMouseLeave: () => void
 }
 
 export default function PropertyCard({ 
   property, 
-  isHovered, 
-  onHover, 
-  onLeave,
-  onClick 
+  onClick, 
+  onMouseEnter, 
+  onMouseLeave 
 }: PropertyCardProps) {
+  
   return (
-    <div
-      className={`bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-200 cursor-pointer overflow-hidden ${
-        isHovered ? 'ring-2 ring-blue-500 scale-105' : ''
-      }`}
-      onMouseEnter={onHover}
-      onMouseLeave={onLeave}
+    <div 
+      className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-white"
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
-      {/* Image */}
-      <div className="relative h-48 overflow-hidden">
-        <img
-          src={property.imageUrl}
+      <div className="relative w-full h-48">
+        <Image
+          src={property.imageUrl || '/placeholder-image.jpg'} // Asegúrate de tener un placeholder
           alt={property.title}
-          className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
+          layout="fill"
+          objectFit="cover"
+          className="transition-transform duration-300 ease-in-out hover:scale-105"
         />
-        <div className="absolute top-3 right-3 bg-blue-600 text-white px-3 py-1 rounded-full font-bold text-sm shadow-lg">
-          ${property.price}/mes
-        </div>
       </div>
-
-      {/* Content */}
+      
       <div className="p-4">
-        <h3 className="font-bold text-gray-800 text-lg mb-2 line-clamp-1">
+        {/* Precio */}
+        <p className="text-2xl font-bold text-blue-600">
+          ${property.price.toLocaleString('en-US')}
+          <span className="text-sm font-normal text-gray-500">/mes</span>
+        </p>
+        
+        {/* Título */}
+        <h3 className="text-lg font-semibold text-gray-800 mt-2 truncate">
           {property.title}
         </h3>
-
-        <p className="text-sm text-gray-500 mb-3">
-          📍 {property.district}
+        
+        {/* Distrito */}
+        <p className="text-sm text-gray-500 truncate">
+          {property.district}
         </p>
 
-        <div className="flex items-center gap-4 text-sm text-gray-600">
-          <span className="flex items-center gap-1">
-            🛏️ {property.bedrooms}
-          </span>
-          <span className="flex items-center gap-1">
-            🚿 {property.bathrooms}
-          </span>
-          <span className="flex items-center gap-1">
-            📐 {property.area}m²
-          </span>
+        {/* Detalles (Camas, Baños, Área) */}
+        <div className="flex items-center gap-4 text-sm text-gray-600 mt-3 pt-3 border-t">
+          <div className="flex items-center gap-1.5">
+            <IoBedOutline className="w-5 h-5 text-gray-500" />
+            <span>{property.bedrooms} hab.</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <LuBath className="w-4 h-4 text-gray-500" />
+            <span>{property.bathrooms} baños</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <TfiRulerAlt className="w-4 h-4 text-gray-500" />
+            <span>{property.area} m²</span>
+          </div>
         </div>
       </div>
     </div>
