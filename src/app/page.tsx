@@ -7,7 +7,7 @@ import ChatWidget from '@/components/chat/ChatWidget'
 import PropertyDetailsModal from '@/components/property/PropertyDetailsModal'
 import PropertyList from '@/components/property/PropertyList'
 import { api, Property, PropertyFilters } from '@/services/api' 
-import { toast } from 'sonner' // Para mostrar notificaciones
+import { toast } from 'sonner' 
 
 const MapView = dynamic(
   () => import('@/components/map/MapView'),
@@ -21,7 +21,6 @@ const MapView = dynamic(
   }
 )
 
-// Define el tipo para el Bbox
 type BBox = [number, number, number, number];
 
 export default function Home() {
@@ -94,7 +93,7 @@ export default function Home() {
     setDepartmentBbox(null);
   };
   
-  // FUNCIÓN MODIFICADA: Llamada desde el mapa (con BBox) O desde la IA (con BBox=null)
+  // Clic en DEPARTAMENTO (del Mapa)
   const handleDepartmentSelect = (departmentName: string, bbox: BBox | null) => {
     const upperDeptName = departmentName.toUpperCase();
     
@@ -105,71 +104,80 @@ export default function Home() {
 
     setDisplayedProperties(filteredPropsByDept); // Muestra la lista
     setSelectedDepartment(upperDeptName); // Resalta el polígono
-    setPanToProperty(null); 
-    setDepartmentBbox(bbox); // Hace zoom inteligente si el BBox no es nulo
+    setPanToProperty(null); // Cancela el paneo de marcador
+    setDepartmentBbox(bbox); // Hace zoom inteligente
   }
   
-  // --- FUNCIÓN DEL CHAT (CORREGIDA PARA SINCRONIZACIÓN) ---
+  // --- ¡FUNCIÓN DEL CHAT (CORREGIDA)! ---
   const handleAIChatFilters = (aiFilters: PropertyFilters) => {
     if (!aiFilters) return;
 
     const departmentName = aiFilters.department;
-    
-    // Separamos el department del resto de filtros de la API
     const { department, ...restOfFiltersFromAI } = aiFilters;
-    
-    // 1. Aplicamos los filtros de la API (Esto recarga la data)
+
+    // 1. Aplicamos los filtros de la API (recarga data)
     const newFilters = { ...filters, ...restOfFiltersFromAI };
     setFilters(newFilters);
     setIsChatFiltering(true); // Ponemos la bandera de que es un filtro de chat
 
-    // 2. Si hay un departamento, SIMULAMOS LA SELECCIÓN DEL MAPA
+    // 2. Si hay un departamento, actualizamos el estado del mapa
     if (departmentName) {
       const upperDeptName = departmentName.toUpperCase();
       
-      // Buscamos la primera propiedad para centrar la vista
-      const firstProp = allProperties.find(
+      // Filtramos la lista COMPLETA (allProperties) para el paneo y la lista
+      // Usamos 'allProperties' porque 'filters' (y por ende la nueva data) 
+      // aún no se ha actualizado (es asíncrono)
+      const filteredPropsByDept = allProperties.filter(
           p => p.department && p.department.toUpperCase() === upperDeptName
       );
 
-      if (firstProp) {
-          // Centramos el mapa en la propiedad del departamento (esto activa el pan)
+      if (filteredPropsByDept.length > 0) {
+          // Tomamos la primera propiedad para centrar la vista
+          const firstProp = filteredPropsByDept[0];
+          
+          // --- ¡ESTA ES LA LÓGICA CORRECTA! ---
+          // 1. Seteamos el pan (esto centrará el mapa Y abrirá el popup)
           setPanToProperty(firstProp); 
           
-          // Resaltamos el polígono. (Pasamos NULL porque no tenemos el BBox aquí)
+          // 2. Seteamos el dpto (esto atenuará los otros marcadores y pondrá el borde azul)
           setSelectedDepartment(upperDeptName);
           
-          // Filtramos la lista visible para que SOLO muestre las de ese dpto.
-          const filteredPropsByDept = allProperties.filter(p => p.department && p.department.toUpperCase() === upperDeptName);
+          // 3. Seteamos la lista (esto llenará la lista de la derecha)
           setDisplayedProperties(filteredPropsByDept);
+          
+          // 4. Reseteamos el BBox (para que no interfiera con el pan)
+          setDepartmentBbox(null);
           
           toast.info(`Filtros de chat aplicados. Centrando en ${departmentName}.`);
 
       } else {
-          // Si no encontramos propiedades en el dpto, limpiamos el mapa
           toast.warning(`La IA sugirió ${departmentName}, pero no se encontraron propiedades.`);
           handleClearSelection();
       }
+    } else {
+      // Si la IA no mandó dpto (ej. solo precio), solo limpiamos la selección del mapa
+      handleClearSelection();
     }
   };
-  
-  // --- (El resto de funciones) ---
+
+  // Función del Navbar
   const handleFilterChange = (newFilters: PropertyFilters) => {
     setFilters(newFilters);
     handleClearSelection(); // Limpiamos la selección del mapa al usar el Navbar
   };
   
+  // Función para cerrar el modal
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedProperty(null);
   };
   
-  // ... (otros handlers sin cambios) ...
-
-
   return (
     <div className="flex flex-col h-screen w-full">
       
+      {/* Asegúrate de haber instalado 'sonner' (npm install sonner) */}
+      {/* Y de haberlo añadido a tu layout.tsx principal */}
+
       <Navbar filters={filters} onFiltersChange={handleFilterChange} />
 
       <div className="flex flex-1 w-full overflow-hidden">
@@ -184,7 +192,7 @@ export default function Home() {
         >
           <MapView 
             properties={allProperties}
-            filteredProperties={displayedProperties} // Aquí pasamos las filtradas
+            filteredProperties={displayedProperties}
             hoveredPropertyId={hoveredProperty?.id}
             onMarkerClick={handleMarkerClick}
             panToProperty={panToProperty}
@@ -192,7 +200,6 @@ export default function Home() {
             selectedDepartment={selectedDepartment}
             departmentBbox={departmentBbox}
           />
-          {/* ¡Le pasamos la nueva función al ChatWidget! */}
           <ChatWidget onFiltersExtracted={handleAIChatFilters} /> 
         </div>
 
@@ -207,7 +214,7 @@ export default function Home() {
         >
           <div className="w-full h-full overflow-y-auto">
             <PropertyList
-              properties={displayedProperties} // Muestra la lista de propiedades visibles
+              properties={displayedProperties} 
               loading={loading}
               onPropertySelect={handleCardClick}
               onPropertyHover={setHoveredProperty}
