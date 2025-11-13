@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import 'mapbox-gl/dist/mapbox-gl.css' 
+import 'mapbox-gl/dist/mapbox-gl.css'
+import { Toaster } from 'sonner' 
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -20,6 +21,7 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body className={inter.className}>
         {children}
+        <Toaster position="top-right" />
       </body>
     </html>
   )
