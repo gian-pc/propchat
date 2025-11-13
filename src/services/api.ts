@@ -23,12 +23,13 @@ export interface Property {
 // --- Interface de PropertyFilters (Actualizada) ---
 export interface PropertyFilters {
   district?: string;
+  department?: string;
+  near?: string; // Lugar de referencia (UTP, parques, malls)
   min_price?: number;
   max_price?: number;
   bedrooms?: number;
   property_type?: string;
-  transaction_type?: 'rent' | 'sale'; // <-- ¡Actualizada!
-  department?: string; // (Este lo usa la IA)
+  transaction_type?: 'rent' | 'sale';
 }
 
 // --- Interface de PropertiesResponse (Sin cambios) ---
@@ -54,23 +55,31 @@ export const api = {
   // Get all properties with optional filters
   async getProperties(filters?: PropertyFilters): Promise<PropertiesResponse> {
     const params = new URLSearchParams();
-    
+
     if (filters?.district) params.append('district', filters.district);
+    if (filters?.department) params.append('department', filters.department);
+    if (filters?.near) params.append('near', filters.near);  // Nuevo: búsqueda geoespacial
     if (filters?.min_price) params.append('min_price', filters.min_price.toString());
     if (filters?.max_price) params.append('max_price', filters.max_price.toString());
     if (filters?.bedrooms) params.append('bedrooms', filters.bedrooms.toString());
     if (filters?.property_type) params.append('property_type', filters.property_type);
-    if (filters?.transaction_type) params.append('transaction_type', filters.transaction_type); // <-- ¡Actualizado!
+    if (filters?.transaction_type) params.append('transaction_type', filters.transaction_type);
 
     const url = `${API_BASE_URL}/api/properties${params.toString() ? `?${params.toString()}` : ''}`;
-    
+
+    console.log('🔍 API Request URL:', url);
+    console.log('🔍 Filters enviados:', filters);
+
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch properties');
     }
-    
-    return response.json();
+
+    const data = await response.json();
+    console.log('✅ Backend retornó:', data.total, 'propiedades');
+
+    return data;
   },
 
   // Get single property by ID
