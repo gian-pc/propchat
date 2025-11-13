@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { X, Heart, Share2, MapPin, Bed, Bath, Maximize, Car, Building, Calendar, Check } from 'lucide-react'
-import { Property } from '@/types/property'
+import { Property } from '@/services/api'
 
 interface PropertyDetailsModalProps {
   property: Property | null

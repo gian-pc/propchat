@@ -46,10 +46,18 @@ export default function Home() {
         setLoading(true);
         const responseData = await api.getProperties(filters);
         setAllProperties(responseData.properties);
-        
-        // Si no estamos filtrando por chat, ocultamos la lista. 
-        if (!isChatFiltering) {
-          handleClearSelection(); 
+
+        // Si estamos filtrando por chat, mostramos la lista
+        if (isChatFiltering) {
+          setDisplayedProperties(responseData.properties);
+
+          // Paneamos a la primera propiedad si existe
+          if (responseData.properties.length > 0) {
+            setPanToProperty(responseData.properties[0]);
+          }
+        } else {
+          // Si NO es chat, ocultamos la lista
+          setDisplayedProperties([]);
         }
 
         if (Object.keys(filters).length > 0) {
@@ -112,52 +120,22 @@ export default function Home() {
   const handleAIChatFilters = (aiFilters: PropertyFilters) => {
     if (!aiFilters) return;
 
-    const departmentName = aiFilters.department;
-    const { department, ...restOfFiltersFromAI } = aiFilters;
-
-    // 1. Aplicamos los filtros de la API (recarga data)
-    const newFilters = { ...filters, ...restOfFiltersFromAI };
+    // 1. Aplicamos TODOS los filtros de la API (incluyendo department)
+    const newFilters = { ...filters, ...aiFilters };
     setFilters(newFilters);
     setIsChatFiltering(true); // Ponemos la bandera de que es un filtro de chat
 
-    // 2. Si hay un departamento, actualizamos el estado del mapa
-    if (departmentName) {
-      const upperDeptName = departmentName.toUpperCase();
-      
-      // Filtramos la lista COMPLETA (allProperties) para el paneo y la lista
-      // Usamos 'allProperties' porque 'filters' (y por ende la nueva data) 
-      // aún no se ha actualizado (es asíncrono)
-      const filteredPropsByDept = allProperties.filter(
-          p => p.department && p.department.toUpperCase() === upperDeptName
-      );
-
-      if (filteredPropsByDept.length > 0) {
-          // Tomamos la primera propiedad para centrar la vista
-          const firstProp = filteredPropsByDept[0];
-          
-          // --- ¡ESTA ES LA LÓGICA CORRECTA! ---
-          // 1. Seteamos el pan (esto centrará el mapa Y abrirá el popup)
-          setPanToProperty(firstProp); 
-          
-          // 2. Seteamos el dpto (esto atenuará los otros marcadores y pondrá el borde azul)
-          setSelectedDepartment(upperDeptName);
-          
-          // 3. Seteamos la lista (esto llenará la lista de la derecha)
-          setDisplayedProperties(filteredPropsByDept);
-          
-          // 4. Reseteamos el BBox (para que no interfiera con el pan)
-          setDepartmentBbox(null);
-          
-          toast.info(`Filtros de chat aplicados. Centrando en ${departmentName}.`);
-
-      } else {
-          toast.warning(`La IA sugirió ${departmentName}, pero no se encontraron propiedades.`);
-          handleClearSelection();
-      }
-    } else {
-      // Si la IA no mandó dpto (ej. solo precio), solo limpiamos la selección del mapa
-      handleClearSelection();
+    // 2. Si hay un departamento, seteamos el estado del mapa
+    if (aiFilters.department) {
+      setSelectedDepartment(aiFilters.department.toUpperCase());
+      setDepartmentBbox(null);
     }
+
+    // El useEffect se encargará de:
+    // - Hacer el fetch con los filtros
+    // - Setear allProperties con los datos del backend
+    // - Setear displayedProperties (porque isChatFiltering = true)
+    // - Panear a la primera propiedad
   };
 
   // Función del Navbar
